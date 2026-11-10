@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Exemple — graphique en barres animé (données fictives)</title>
+    <!-- GSAP en local : aucune requête réseau pendant le rendu -->
+    <script src="gsap.min.js"></script>
+    <style>
+      :root {
+        --ground: #0b1320;
+        --ink: #f3f5f7;
+        --muted: #8a97a8;
+        --accent: #ff8a3d;
+        --bar: #4f8df7;
+        --bar-dim: #27354a;
+      }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: var(--ground);
+        color: var(--ink);
+        font-family: Inter, "Segoe UI", Arial, Helvetica, sans-serif;
+      }
+      .scene { position: absolute; inset: 0; }
+
+      /* ---------- Scène 1 : le titre ---------- */
+      #intro-title {
+        position: absolute; left: 192px; right: 192px; top: 420px;
+        text-align: center; font-size: 84px; font-weight: 700;
+        letter-spacing: -0.02em; line-height: 1.15;
+      }
+      #intro-title .w { display: inline-block; margin: 0 0.22em; } /* un filtre par mot exige un bloc */
+      #intro-sub {
+        position: absolute; left: 192px; right: 192px; top: 560px;
+        text-align: center; font-size: 36px; color: var(--muted);
+      }
+
+      /* ---------- Scène 2 : le graphique ---------- */
+      #chart-title { position: absolute; left: 192px; top: 108px; font-size: 64px; font-weight: 700; letter-spacing: -0.02em; }
+      #chart-subtitle { position: absolute; left: 192px; top: 196px; font-size: 30px; color: var(--muted); }
+      #chart-svg { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+      #chart-svg .grid { stroke: #223047; stroke-width: 2; }
+      #chart-svg .baseline { stroke: #5b6b82; stroke-width: 3; }
+      #chart-svg .ref { stroke: var(--muted); stroke-width: 3; stroke-dasharray: 14 12; }
+      #chart-svg .ylabel, #chart-svg .reflabel { fill: var(--muted); font-size: 28px; }
+      #chart-svg .xlabel { fill: var(--ink); font-size: 30px; font-weight: 500; }
+      #chart-svg .value {
+        fill: var(--ink); font-size: 40px; font-weight: 600;
+        font-variant-numeric: tabular-nums;          /* chiffres à chasse fixe : le compteur ne tremble pas */
+        paint-order: stroke; stroke: var(--ground); stroke-width: 10px; stroke-linejoin: round; /* halo lisible sur la grille */
+      }
+      #chart-svg .reflabel { paint-order: stroke; stroke: var(--ground); stroke-width: 8px; stroke-linejoin: round; }
+      #chart-note {
+        position: absolute; left: 652px; top: 378px; width: 620px;
+        font-size: 36px; font-weight: 600; line-height: 1.2; color: var(--accent);
+      }
+      #chart-note-line { display: block; width: 56px; height: 4px; margin-bottom: 14px; background: var(--accent); }
+      #chart-source { position: absolute; left: 192px; top: 974px; font-size: 28px; color: var(--muted); }
+    </style>
+  </head>
+  <body>
+    <!-- Scène 1 (0 → 4 s) -->
+    <div class="scene" id="intro">
+      <h1 id="intro-title">
+        <span class="w">Un</span><span class="w">graphique</span><span class="w accent">animé,</span><span class="w">écrit</span><span class="w">en</span><span class="w">HTML</span>
+      </h1>
+      <p id="intro-sub">Chaque image est une fonction du temps</p>
+    </div>
+
+    <!-- Scène 2 (4 → 11 s) -->
+    <div class="scene" id="chart">
+      <h1 id="chart-title">Où passe le temps d'un projet data ?</h1>
+      <p id="chart-subtitle">Part de chaque étape, en % du temps total</p>
+
+      <svg id="chart-svg" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg">
+        <!-- grille (10, 20, 30, 40 %) : y = 880 − valeur × 14,5 -->
+        <line class="grid" id="g10" x1="192" y1="735" x2="1728" y2="735" />
+        <line class="grid" id="g20" x1="192" y1="590" x2="1728" y2="590" />
+        <line class="grid" id="g30" x1="192" y1="445" x2="1728" y2="445" />
+        <line class="grid" id="g40" x1="192" y1="300" x2="1728" y2="300" />
+        <text class="ylabel" id="y10" x="170" y="744" text-anchor="end">10 %</text>
+        <text class="ylabel" id="y20" x="170" y="599" text-anchor="end">20 %</text>
+        <text class="ylabel" id="y30" x="170" y="454" text-anchor="end">30 %</text>
+        <text class="ylabel" id="y40" x="170" y="309" text-anchor="end">40 %</text>
+        <!-- axe -->
+        <line class="baseline" id="baseline" x1="192" y1="880" x2="1728" y2="880" />
+        <!-- ligne de référence : la moyenne (100 / 6 = 16,7 %) -->
+        <line class="ref" id="refline" x1="192" y1="638" x2="1728" y2="638" />
+        <text class="reflabel" id="reflabel" x="1728" y="626" text-anchor="end">moyenne : 16,7 %</text>
+        <!-- barres (hauteur = valeur × 14,5 px, base y = 880) -->
+        <rect class="bar" id="b0" x="192"    y="619"   width="150" height="261"   rx="6" fill="#4f8df7" />
+        <rect class="bar" id="b1" x="469.2"  y="387"   width="150" height="493"   rx="6" fill="#4f8df7" />
+        <rect class="bar" id="b2" x="746.4"  y="662.5" width="150" height="217.5" rx="6" fill="#4f8df7" />
+        <rect class="bar" id="b3" x="1023.6" y="749.5" width="150" height="130.5" rx="6" fill="#4f8df7" />
+        <rect class="bar" id="b4" x="1300.8" y="706"   width="150" height="174"   rx="6" fill="#4f8df7" />
+        <rect class="bar" id="b5" x="1578"   y="706"   width="150" height="174"   rx="6" fill="#4f8df7" />
+        <!-- compteurs -->
+        <text class="value" id="v0" x="267"    y="601" text-anchor="middle">0 %</text>
+        <text class="value" id="v1" x="544.2"  y="369" text-anchor="middle">0 %</text>
+        <text class="value" id="v2" x="821.4"  y="644" text-anchor="middle">0 %</text>
+        <text class="value" id="v3" x="1098.6" y="731" text-anchor="middle">0 %</text>
+        <text class="value" id="v4" x="1375.8" y="688" text-anchor="middle">0 %</text>
+        <text class="value" id="v5" x="1653"   y="688" text-anchor="middle">0 %</text>
+        <!-- catégories -->
+        <text class="xlabel" id="x0" x="267"    y="928" text-anchor="middle">Collecte</text>
+        <text class="xlabel" id="x1" x="544.2"  y="928" text-anchor="middle">Nettoyage</text>
+        <text class="xlabel" id="x2" x="821.4"  y="928" text-anchor="middle">Modélisation</text>
+        <text class="xlabel" id="x3" x="1098.6" y="928" text-anchor="middle">Évaluation</text>
+        <text class="xlabel" id="x4" x="1375.8" y="928" text-anchor="middle">Déploiement</text>
+        <text class="xlabel" id="x5" x="1653"   y="928" text-anchor="middle">Documentation</text>
+      </svg>
+
+      <div id="chart-note">
+        <span id="chart-note-line"></span>
+        <span id="chart-note-text">Un tiers du temps<br />part dans le nettoyage</span>
+      </div>
+      <p id="chart-source">Données fictives, à titre d'illustration — rendu HTML → MP4</p>
+    </div>
+
+    <script>
+      // ======================================================================
+      // LE CONTRAT : une timeline GSAP en pause ; rendu.py appelle renderAt(t)
+      // pour chaque image. Tout ce qui est visible est une fonction de t.
+      // ======================================================================
+      const tl = gsap.timeline({ paused: true });
+
+      // Un seul module de données pilote toutes les valeurs (même arrondi partout).
+      const DATA = [18, 34, 15, 9, 12, 12];
+      const HIGHLIGHT = 1; // Nettoyage
+      const GREY = "#3b475a", INK = "#f3f5f7", MUTED = "#8a97a8", ACCENT = "#ff8a3d", BAR = "#4f8df7", DIM = "#27354a";
+      const IR = { immediateRender: true }; // l'état « from » est posé dès la construction : rien ne fuit avant son heure
+
+      // ---------- Scène 1 : le titre (0 → 3,9 s) ----------
+      const words = document.querySelectorAll("#intro-title .w");
+      words.forEach((w, i) => {
+        const to = w.classList.contains("accent") ? ACCENT : INK;
+        tl.fromTo(w, { color: GREY }, { color: to, duration: 0.25, ease: "power2.out" }, 0.1 + i * 0.09);
+      });
+      tl.fromTo("#intro-sub", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.2, ease: "power3.out" }, 0.6);
+      words.forEach((w, i) => {
+        tl.to(w, { opacity: 0, filter: "blur(8px)", duration: 0.13, ease: "power3.in" }, 3.45 + i * 0.05);
+      });
+      tl.to("#intro-sub", { opacity: 0, filter: "blur(8px)", duration: 0.18, ease: "power3.in" }, 3.55);
+
+      // ---------- Scène 2 : le graphique (4 → 11 s) ----------
+      const S = 4.0; // début de la scène
+      tl.fromTo("#chart-title", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.2, ease: "power3.out", ...IR }, S);
+      tl.fromTo("#chart-subtitle", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.2, ease: "power3.out", ...IR }, S + 0.15);
+
+      // 1) le cadre : l'axe se trace, la grille apparaît
+      tl.fromTo("#baseline", { attr: { x2: 192 } }, { attr: { x2: 1728 }, duration: 0.5, ease: "power2.inOut", ...IR }, S + 0.3);
+      ["#g10", "#g20", "#g30", "#g40"].forEach((id, i) => tl.fromTo(id, { opacity: 0 }, { opacity: 1, duration: 0.25, ...IR }, S + 0.45 + i * 0.06));
+      ["#y10", "#y20", "#y30", "#y40"].forEach((id, i) => tl.fromTo(id, { opacity: 0 }, { opacity: 1, duration: 0.25, ...IR }, S + 0.5 + i * 0.06));
+      for (let i = 0; i < 6; i++) {
+        tl.fromTo("#x" + i, { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.2, ...IR }, S + 0.7 + i * 0.06);
+      }
+      tl.fromTo("#chart-source", { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.2, ...IR }, S + 0.8);
+
+      // 2) la ligne de référence
+      tl.fromTo("#refline", { attr: { x2: 192 } }, { attr: { x2: 1728 }, duration: 0.45, ease: "power2.inOut", ...IR }, S + 1.1);
+      tl.fromTo("#reflabel", { opacity: 0 }, { opacity: 1, duration: 0.15, ...IR }, S + 1.45);
+
+      // 3) les données se dessinent : chaque barre pousse depuis sa base, son compteur monte en 1,4 s
+      const T_BARS = S + 1.7;
+      const counters = DATA.map(() => ({ v: 0 }));
+      DATA.forEach((value, i) => {
+        const at = T_BARS + i * 0.07; // 70 ms entre les barres
+        tl.fromTo("#b" + i, { scaleY: 0, transformOrigin: "50% 100%" }, { scaleY: 1, duration: 0.9, ease: "expo.out", ...IR }, at);
+        const label = document.querySelector("#v" + i);
+        tl.fromTo(label, { opacity: 0 }, { opacity: 1, duration: 0.15, ...IR }, at);
+        tl.fromTo(counters[i], { v: 0 }, {
+          v: value, duration: 1.4, ease: "power2.out", ...IR,
+          onUpdate: () => { label.textContent = Math.round(counters[i].v) + " %"; },
+        }, at);
+      });
+
+      // 4) une seule annotation : une série en couleur, les autres en gris
+      const T_NOTE = S + 3.5;
+      DATA.forEach((_, i) => {
+        const hero = i === HIGHLIGHT;
+        tl.fromTo("#b" + i, { fill: BAR }, { fill: hero ? ACCENT : DIM, duration: 0.4, ease: "power2.inOut" }, T_NOTE);
+        tl.to("#v" + i, { fill: hero ? ACCENT : MUTED, duration: 0.4, ease: "power2.inOut" }, T_NOTE);
+      });
+      tl.fromTo("#chart-note-line", { scaleX: 0, transformOrigin: "0% 50%" }, { scaleX: 1, duration: 0.25, ease: "power2.out", ...IR }, S + 3.7);
+      tl.fromTo("#chart-note-text", { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.13, ...IR }, S + 3.72);
+
+      // ---------- Ce que rendu.py utilise ----------
+      window.__duration = 11;                 // secondes (le dernier plan tient ≥ 2 s)
+      // seek(t, false) : le « false » est indispensable, sinon GSAP n'exécute pas les onUpdate (les compteurs resteraient à 0).
+      window.renderAt = (t) => tl.seek(t, false);
+      window.renderAt(0);
+    </script>
+  </body>
+</html>

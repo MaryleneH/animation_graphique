@@ -1,0 +1,8 @@
+*.mp4
+*.gif
+__pycache__/
+.venv/
+node_modules/
+.hyperframes/
+.DS_Store
+brouillon*
